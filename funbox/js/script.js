@@ -4,7 +4,6 @@
 let currentSection = 'hub';
 let gravityEngine = null;
 let censusIntervals = [];
-let gravityClickHandler = null; // OPRAVA: explicitní globální deklarace
 
 function navigateTo(id) {
     const oldSection = document.getElementById(currentSection);
@@ -78,7 +77,7 @@ function initTimeline() {
     timelineInitialized = true;
 
     const container = document.querySelector('.timeline-container');
-    timelineData.forEach((item, i) => {
+    timelineData.forEach((item) => {
         const div = document.createElement('div');
         div.className = 'timeline-item';
         div.innerHTML = `
@@ -203,120 +202,149 @@ function closeResult() {
 // GRAVITAČNÍ HŘIŠTĚ
 // ============================================================
 let matterEngine, matterRender, matterRunner, matterBodies = [];
+let gravityClickHandler = null;
 
 function initGravity() {
+    stopGravity();
+
     const container = document.getElementById('canvasContainer');
     const canvas = document.getElementById('gravityCanvas');
     const hint = document.getElementById('canvasHint');
-
-    // OPRAVA: Vždy odstraníme starý listener před přidáním nového
-    if (gravityClickHandler) {
-        canvas.removeEventListener('click', gravityClickHandler);
-        gravityClickHandler = null;
-    }
+    const slider = document.getElementById('gravitySlider');
+    const gValue = document.getElementById('gravityValue');
 
     const w = container.clientWidth;
     const h = container.clientHeight;
-    canvas.width = w * window.devicePixelRatio;
-    canvas.height = h * window.devicePixelRatio;
+    const dpr = window.devicePixelRatio || 1;
+
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
 
-    const Engine = Matter.Engine,
-          Render = Matter.Render,
-          Runner = Matter.Runner,
-          Bodies = Matter.Bodies,
-          Composite = Matter.Composite;
+    const Engine = Matter.Engine;
+    const Render = Matter.Render;
+    const Runner = Matter.Runner;
+    const Bodies = Matter.Bodies;
+    const Composite = Matter.Composite;
 
     matterEngine = Engine.create();
-    matterEngine.gravity.y = parseFloat(document.getElementById('gravitySlider').value) || 1;
+    matterEngine.gravity.y = parseFloat(slider.value) || 1;
 
     matterRender = Render.create({
         canvas: canvas,
         engine: matterEngine,
         options: {
-            width: w * window.devicePixelRatio,
-            height: h * window.devicePixelRatio,
+            width: w * dpr,
+            height: h * dpr,
             wireframes: false,
             background: '#ffffff',
             pixelRatio: 1
         }
     });
 
-    const wallOpts = { isStatic: true, render: { fillStyle: '#e4e4e7' } };
+    const wallOpts = {
+        isStatic: true,
+        render: { fillStyle: '#e4e4e7' }
+    };
+
     const thick = 60;
-    const dpr = window.devicePixelRatio;
     Composite.add(matterEngine.world, [
-        Bodies.rectangle(w * dpr / 2, h * dpr + thick / 2, w * dpr + 100, thick, wallOpts),
-        Bodies.rectangle(-thick / 2, h * dpr / 2, thick, h * dpr * 3, wallOpts),
-        Bodies.rectangle(w * dpr + thick / 2, h * dpr / 2, thick, h * dpr * 3, wallOpts)
+        Bodies.rectangle((w * dpr) / 2, h * dpr + thick / 2, w * dpr + 100, thick, wallOpts),
+        Bodies.rectangle(-thick / 2, (h * dpr) / 2, thick, h * dpr * 3, wallOpts),
+        Bodies.rectangle(w * dpr + thick / 2, (h * dpr) / 2, thick, h * dpr * 3, wallOpts)
     ]);
 
     Render.run(matterRender);
     matterRunner = Runner.create();
     Runner.run(matterRunner, matterEngine);
 
-    let hintVisible = hint.style.opacity !== '0';
+    hint.style.opacity = '1';
+    let hintVisible = true;
 
-    // OPRAVA: Vytvoříme nový handler a přiřadíme ho globální proměnné
     gravityClickHandler = (e) => {
+        if (!matterEngine) return;
+
         if (hintVisible) {
             hint.style.opacity = '0';
             hintVisible = false;
         }
+
         const rect = canvas.getBoundingClientRect();
         const scaleX = canvas.width / rect.width;
         const scaleY = canvas.height / rect.height;
         const x = (e.clientX - rect.left) * scaleX;
         const y = (e.clientY - rect.top) * scaleY;
-        const radius = 10 + Math.random() * 20;
+        const radius = (10 + Math.random() * 20) * dpr;
+
         const hue = Math.floor(Math.random() * 360);
-        const ball = Bodies.circle(x, y, radius * window.devicePixelRatio, {
-            restitution: 0.6,
-            friction: 0.05,
-            render: { fillStyle: `hsl(${hue}, 70%, 55%)` }
+        const ball = Bodies.circle(x, y, radius, {
+            restitution: 0.75,
+            friction: 0.02,
+            frictionAir: 0.001,
+            density: 0.0012,
+            render: {
+                fillStyle: `hsl(${hue}, 75%, 58%)`
+            }
         });
+
         Composite.add(matterEngine.world, ball);
         matterBodies.push(ball);
     };
 
     canvas.addEventListener('click', gravityClickHandler);
 
-    const slider = document.getElementById('gravitySlider');
-    const gValue = document.getElementById('gravityValue');
-    const currentVal = parseFloat(slider.value) || 1;
-    gValue.textContent = currentVal.toFixed(1);
-
-    // OPRAVA: Odstraníme starý oninput a přiřadíme nový
-    slider.oninput = null;
     slider.oninput = () => {
+        if (!matterEngine) return;
         const v = parseFloat(slider.value);
         matterEngine.gravity.y = v;
         gValue.textContent = v.toFixed(1);
+
+        const percent = ((v - parseFloat(slider.min || 0)) / (parseFloat(slider.max || 5) - parseFloat(slider.min || 0))) * 100;
+        slider.style.setProperty('--val', `${percent}%`);
     };
+
+    gValue.textContent = matterEngine.gravity.y.toFixed(1);
+    const percent = ((matterEngine.gravity.y - parseFloat(slider.min || 0)) / (parseFloat(slider.max || 5) - parseFloat(slider.min || 0))) * 100;
+    slider.style.setProperty('--val', `${percent}%`);
 
     gravityEngine = matterEngine;
 }
 
 function stopGravity() {
     const canvas = document.getElementById('gravityCanvas');
-    // OPRAVA: Odstraníme click listener při zastavení
-    if (gravityClickHandler && canvas) {
+
+    if (canvas && gravityClickHandler) {
         canvas.removeEventListener('click', gravityClickHandler);
         gravityClickHandler = null;
     }
-    if (matterRender) Matter.Render.stop(matterRender);
-    if (matterRunner) Matter.Runner.stop(matterRunner);
-    if (matterEngine) Matter.Engine.clear(matterEngine);
+
+    if (matterRender) {
+        Matter.Render.stop(matterRender);
+        if (matterRender.canvas) {
+            const ctx = matterRender.canvas.getContext('2d');
+            ctx && ctx.clearRect(0, 0, matterRender.canvas.width, matterRender.canvas.height);
+        }
+        matterRender.textures = {};
+    }
+
+    if (matterRunner) {
+        Matter.Runner.stop(matterRunner);
+    }
+
+    if (matterEngine) {
+        Matter.World.clear(matterEngine.world, false);
+        Matter.Engine.clear(matterEngine);
+    }
+
     matterBodies = [];
     matterEngine = null;
     matterRender = null;
     matterRunner = null;
+    gravityEngine = null;
 }
 
 function resetGravity() {
-    stopGravity();
-    document.getElementById('canvasHint').style.opacity = '1';
     initGravity();
 }
 
@@ -534,11 +562,10 @@ function initColorGame() {
 }
 
 function randomColor() {
-    return {
-        r: Math.floor(Math.random() * 256),
-        g: Math.floor(Math.random() * 256),
-        b: Math.floor(Math.random() * 256)
-    };
+    const r = Math.floor(Math.random() * 256);
+    const g = Math.floor(Math.random() * 256);
+    const b = Math.floor(Math.random() * 256);
+    return { r, g, b };
 }
 
 function colorToHex(c) {
@@ -563,14 +590,17 @@ function newColorRound() {
     const correctHex = colorToHex(correct);
     const variance = Math.max(30, 100 - colorStreak * 8);
 
-    colorCorrectIndex = Math.floor(Math.random() * 6);
     let options = [];
+    colorCorrectIndex = Math.floor(Math.random() * 6);
     for (let i = 0; i < 6; i++) {
-        options.push(i === colorCorrectIndex ? correct : similarColor(correct, variance));
+        if (i === colorCorrectIndex) {
+            options.push(correct);
+        } else {
+            options.push(similarColor(correct, variance));
+        }
     }
 
-    document.getElementById('colorDisplay').style.backgroundColor = correctHex;
-    document.getElementById('colorDisplay').style.display = 'block';
+    document.getElementById('colorDisplay').style.display = 'none';
     document.getElementById('colorHex').textContent = correctHex;
 
     const optionsEl = document.getElementById('colorOptions');
