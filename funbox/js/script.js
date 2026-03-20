@@ -74,6 +74,7 @@ function initTimeline() {
         }, 100);
         return;
     }
+
     timelineInitialized = true;
 
     const container = document.querySelector('.timeline-container');
@@ -153,6 +154,7 @@ function toggleIngredient(i, btn) {
 function updatePot() {
     const potItems = document.getElementById('potItems');
     const cookBtn = document.getElementById('cookBtn');
+
     if (selectedIngredients.size === 0) {
         potItems.textContent = 'Zatím prázdný hrnec...';
         cookBtn.disabled = true;
@@ -181,7 +183,7 @@ function cook() {
     setTimeout(() => {
         const r = recipes[0];
         const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
-        const dishIcons = ['🍽️','🥘','🫕','🍜','🥣','🍛'];
+        const dishIcons = ['🍽️', '🥘', '🫕', '🍜', '🥣', '🍛'];
 
         document.getElementById('dishIcon').textContent = pick(dishIcons);
         document.getElementById('dishName').textContent = pick(r.names);
@@ -199,13 +201,19 @@ function closeResult() {
 }
 
 // ============================================================
-// GRAVITAČNÍ HŘIŠTĚ
+// GRAVITAČNÍ HŘIŠTĚ - OPRAVENO POŘÁDNĚ
 // ============================================================
-let matterEngine, matterRender, matterRunner, matterBodies = [];
+let matterEngine, matterRender, matterRunner;
 let gravityClickHandler = null;
+let gravityInitialized = false;
+let gravityWalls = [];
+let gravityBalls = [];
 
 function initGravity() {
-    stopGravity();
+    if (gravityInitialized) {
+        resetGravity();
+        return;
+    }
 
     const container = document.getElementById('canvasContainer');
     const canvas = document.getElementById('gravityCanvas');
@@ -249,35 +257,34 @@ function initGravity() {
     };
 
     const thick = 60;
-    Composite.add(matterEngine.world, [
+    gravityWalls = [
         Bodies.rectangle((w * dpr) / 2, h * dpr + thick / 2, w * dpr + 100, thick, wallOpts),
         Bodies.rectangle(-thick / 2, (h * dpr) / 2, thick, h * dpr * 3, wallOpts),
         Bodies.rectangle(w * dpr + thick / 2, (h * dpr) / 2, thick, h * dpr * 3, wallOpts)
-    ]);
+    ];
+
+    Composite.add(matterEngine.world, gravityWalls);
 
     Render.run(matterRender);
     matterRunner = Runner.create();
     Runner.run(matterRunner, matterEngine);
 
-    hint.style.opacity = '1';
-    let hintVisible = true;
-
-    gravityClickHandler = (e) => {
+    gravityClickHandler = function (e) {
         if (!matterEngine) return;
 
-        if (hintVisible) {
+        if (hint) {
             hint.style.opacity = '0';
-            hintVisible = false;
         }
 
         const rect = canvas.getBoundingClientRect();
         const scaleX = canvas.width / rect.width;
         const scaleY = canvas.height / rect.height;
+
         const x = (e.clientX - rect.left) * scaleX;
         const y = (e.clientY - rect.top) * scaleY;
         const radius = (10 + Math.random() * 20) * dpr;
-
         const hue = Math.floor(Math.random() * 360);
+
         const ball = Bodies.circle(x, y, radius, {
             restitution: 0.75,
             friction: 0.02,
@@ -289,10 +296,11 @@ function initGravity() {
         });
 
         Composite.add(matterEngine.world, ball);
-        matterBodies.push(ball);
+        gravityBalls.push(ball);
     };
 
-    canvas.addEventListener('click', gravityClickHandler);
+    canvas.onclick = null;
+    canvas.addEventListener('click', gravityClickHandler, false);
 
     slider.oninput = () => {
         if (!matterEngine) return;
@@ -309,22 +317,47 @@ function initGravity() {
     slider.style.setProperty('--val', `${percent}%`);
 
     gravityEngine = matterEngine;
+    gravityInitialized = true;
+}
+
+function resetGravity() {
+    if (!matterEngine) return;
+
+    const Composite = Matter.Composite;
+    const hint = document.getElementById('canvasHint');
+
+    for (const ball of gravityBalls) {
+        Composite.remove(matterEngine.world, ball);
+    }
+    gravityBalls = [];
+
+    if (hint) {
+        hint.style.opacity = '1';
+    }
 }
 
 function stopGravity() {
     const canvas = document.getElementById('gravityCanvas');
 
     if (canvas && gravityClickHandler) {
-        canvas.removeEventListener('click', gravityClickHandler);
-        gravityClickHandler = null;
+        canvas.removeEventListener('click', gravityClickHandler, false);
+        canvas.onclick = null;
     }
+
+    gravityClickHandler = null;
+    gravityBalls = [];
+    gravityWalls = [];
 
     if (matterRender) {
         Matter.Render.stop(matterRender);
+
         if (matterRender.canvas) {
             const ctx = matterRender.canvas.getContext('2d');
-            ctx && ctx.clearRect(0, 0, matterRender.canvas.width, matterRender.canvas.height);
+            if (ctx) {
+                ctx.clearRect(0, 0, matterRender.canvas.width, matterRender.canvas.height);
+            }
         }
+
         matterRender.textures = {};
     }
 
@@ -337,15 +370,11 @@ function stopGravity() {
         Matter.Engine.clear(matterEngine);
     }
 
-    matterBodies = [];
     matterEngine = null;
     matterRender = null;
     matterRunner = null;
     gravityEngine = null;
-}
-
-function resetGravity() {
-    initGravity();
+    gravityInitialized = false;
 }
 
 // ============================================================
@@ -464,7 +493,7 @@ function updateReactionUI() {
     ).join('');
 
     const bestTime = Math.min(...reactionResults);
-    const avg = Math.round(reactionResults.reduce((a,b) => a+b, 0) / reactionResults.length);
+    const avg = Math.round(reactionResults.reduce((a, b) => a + b, 0) / reactionResults.length);
     best.innerHTML = `Nejlepší: <span>${bestTime} ms</span> · Průměr: <span>${avg} ms</span>`;
 }
 
@@ -592,6 +621,7 @@ function newColorRound() {
 
     let options = [];
     colorCorrectIndex = Math.floor(Math.random() * 6);
+
     for (let i = 0; i < 6; i++) {
         if (i === colorCorrectIndex) {
             options.push(correct);
@@ -659,6 +689,7 @@ function initTyping() {
     typingText = typingTexts[Math.floor(Math.random() * typingTexts.length)];
     typingStarted = false;
     typingFinished = false;
+
     if (typingInterval) clearInterval(typingInterval);
 
     const input = document.getElementById('typingInput');
@@ -696,6 +727,7 @@ function initTyping() {
 function renderTypingDisplay(typed, full) {
     const display = document.getElementById('typingDisplay');
     let html = '';
+
     for (let i = 0; i < full.length; i++) {
         if (i < typed.length) {
             if (typed[i] === full[i]) {
@@ -709,6 +741,7 @@ function renderTypingDisplay(typed, full) {
             html += `<span class="typed-remaining">${escapeHtml(full[i])}</span>`;
         }
     }
+
     display.innerHTML = html;
 }
 
@@ -721,6 +754,7 @@ function escapeHtml(c) {
 
 function updateTypingStats() {
     if (!typingStarted) return;
+
     const elapsed = (performance.now() - typingStartTime) / 1000;
     const typed = document.getElementById('typingInput').value;
 
