@@ -248,8 +248,13 @@ function initGravity() {
     matterRunner = Runner.create();
     Runner.run(matterRunner, matterEngine);
 
+    // OPRAVA: Odstraníme starý listener před přidáním nového
+    if (gravityClickHandler) {
+        canvas.removeEventListener('click', gravityClickHandler);
+    }
+
     let hintVisible = true;
-    canvas.addEventListener('click', (e) => {
+    gravityClickHandler = (e) => {
         if (hintVisible) {
             hint.style.opacity = '0';
             hintVisible = false;
@@ -271,7 +276,8 @@ function initGravity() {
         });
         Composite.add(matterEngine.world, ball);
         matterBodies.push(ball);
-    });
+    };
+    canvas.addEventListener('click', gravityClickHandler);
 
     const slider = document.getElementById('gravitySlider');
     const gValue = document.getElementById('gravityValue');
