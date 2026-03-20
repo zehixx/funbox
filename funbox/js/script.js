@@ -4,6 +4,7 @@
 let currentSection = 'hub';
 let gravityEngine = null;
 let censusIntervals = [];
+let gravityClickHandler = null; // OPRAVA: explicitní globální deklarace
 
 function navigateTo(id) {
     const oldSection = document.getElementById(currentSection);
@@ -208,6 +209,12 @@ function initGravity() {
     const canvas = document.getElementById('gravityCanvas');
     const hint = document.getElementById('canvasHint');
 
+    // OPRAVA: Vždy odstraníme starý listener před přidáním nového
+    if (gravityClickHandler) {
+        canvas.removeEventListener('click', gravityClickHandler);
+        gravityClickHandler = null;
+    }
+
     const w = container.clientWidth;
     const h = container.clientHeight;
     canvas.width = w * window.devicePixelRatio;
@@ -222,7 +229,7 @@ function initGravity() {
           Composite = Matter.Composite;
 
     matterEngine = Engine.create();
-    matterEngine.gravity.y = 1;
+    matterEngine.gravity.y = parseFloat(document.getElementById('gravitySlider').value) || 1;
 
     matterRender = Render.create({
         canvas: canvas,
@@ -238,22 +245,20 @@ function initGravity() {
 
     const wallOpts = { isStatic: true, render: { fillStyle: '#e4e4e7' } };
     const thick = 60;
+    const dpr = window.devicePixelRatio;
     Composite.add(matterEngine.world, [
-        Bodies.rectangle(w * window.devicePixelRatio / 2, h * window.devicePixelRatio + thick / 2, w * window.devicePixelRatio + 100, thick, wallOpts),
-        Bodies.rectangle(-thick / 2, h * window.devicePixelRatio / 2, thick, h * window.devicePixelRatio * 3, wallOpts),
-        Bodies.rectangle(w * window.devicePixelRatio + thick / 2, h * window.devicePixelRatio / 2, thick, h * window.devicePixelRatio * 3, wallOpts)
+        Bodies.rectangle(w * dpr / 2, h * dpr + thick / 2, w * dpr + 100, thick, wallOpts),
+        Bodies.rectangle(-thick / 2, h * dpr / 2, thick, h * dpr * 3, wallOpts),
+        Bodies.rectangle(w * dpr + thick / 2, h * dpr / 2, thick, h * dpr * 3, wallOpts)
     ]);
 
     Render.run(matterRender);
     matterRunner = Runner.create();
     Runner.run(matterRunner, matterEngine);
 
-    // OPRAVA: Odstraníme starý listener před přidáním nového
-    if (gravityClickHandler) {
-        canvas.removeEventListener('click', gravityClickHandler);
-    }
+    let hintVisible = hint.style.opacity !== '0';
 
-    let hintVisible = true;
+    // OPRAVA: Vytvoříme nový handler a přiřadíme ho globální proměnné
     gravityClickHandler = (e) => {
         if (hintVisible) {
             hint.style.opacity = '0';
@@ -265,24 +270,25 @@ function initGravity() {
         const x = (e.clientX - rect.left) * scaleX;
         const y = (e.clientY - rect.top) * scaleY;
         const radius = 10 + Math.random() * 20;
-
         const hue = Math.floor(Math.random() * 360);
         const ball = Bodies.circle(x, y, radius * window.devicePixelRatio, {
             restitution: 0.6,
             friction: 0.05,
-            render: {
-                fillStyle: `hsl(${hue}, 70%, 55%)`
-            }
+            render: { fillStyle: `hsl(${hue}, 70%, 55%)` }
         });
         Composite.add(matterEngine.world, ball);
         matterBodies.push(ball);
     };
+
     canvas.addEventListener('click', gravityClickHandler);
 
     const slider = document.getElementById('gravitySlider');
     const gValue = document.getElementById('gravityValue');
-    slider.value = 1;
-    gValue.textContent = '1.0';
+    const currentVal = parseFloat(slider.value) || 1;
+    gValue.textContent = currentVal.toFixed(1);
+
+    // OPRAVA: Odstraníme starý oninput a přiřadíme nový
+    slider.oninput = null;
     slider.oninput = () => {
         const v = parseFloat(slider.value);
         matterEngine.gravity.y = v;
@@ -293,6 +299,12 @@ function initGravity() {
 }
 
 function stopGravity() {
+    const canvas = document.getElementById('gravityCanvas');
+    // OPRAVA: Odstraníme click listener při zastavení
+    if (gravityClickHandler && canvas) {
+        canvas.removeEventListener('click', gravityClickHandler);
+        gravityClickHandler = null;
+    }
     if (matterRender) Matter.Render.stop(matterRender);
     if (matterRunner) Matter.Runner.stop(matterRunner);
     if (matterEngine) Matter.Engine.clear(matterEngine);
@@ -368,7 +380,7 @@ function stopCensus() {
 // ============================================================
 // REAKČNÍ TEST
 // ============================================================
-let reactionState = 'idle'; // idle, waiting, ready, result, too-early
+let reactionState = 'idle';
 let reactionTimeout = null;
 let reactionStartTime = 0;
 let reactionResults = [];
@@ -390,7 +402,6 @@ function handleReactionClick() {
     const text = document.getElementById('reactionText');
 
     if (reactionState === 'idle' || reactionState === 'result' || reactionState === 'too-early') {
-        // Start waiting
         reactionState = 'waiting';
         box.className = 'reaction-box waiting';
         text.textContent = 'Počkej na zelenou...';
@@ -402,13 +413,11 @@ function handleReactionClick() {
             reactionStartTime = performance.now();
         }, delay);
     } else if (reactionState === 'waiting') {
-        // Clicked too early
         clearTimeout(reactionTimeout);
         reactionState = 'too-early';
         box.className = 'reaction-box too-early';
         text.textContent = 'Příliš brzy! Klikni znovu.';
     } else if (reactionState === 'ready') {
-        // Measure
         const time = Math.round(performance.now() - reactionStartTime);
         reactionState = 'result';
         box.className = 'reaction-box result';
@@ -478,7 +487,6 @@ function flipMemoryCard(index, card) {
 
         const [a, b] = memoryFlipped;
         if (memoryCards[a.index] === memoryCards[b.index]) {
-            // Match
             a.card.classList.add('matched');
             b.card.classList.add('matched');
             memoryMatched++;
@@ -493,7 +501,6 @@ function flipMemoryCard(index, card) {
                 }, 500);
             }
         } else {
-            // No match
             memoryLocked = true;
             setTimeout(() => {
                 a.card.classList.remove('flipped');
@@ -511,7 +518,7 @@ function closeMemoryModal() {
 }
 
 // ============================================================
-// HÁDEJ BARVU - OPRAVENO
+// HÁDEJ BARVU
 // ============================================================
 let colorScore = 0;
 let colorStreak = 0;
@@ -527,14 +534,14 @@ function initColorGame() {
 }
 
 function randomColor() {
-    const r = Math.floor(Math.random() * 256);
-    const g = Math.floor(Math.random() * 256);
-    const b = Math.floor(Math.random() * 256);
-    return { r, g, b };
+    return {
+        r: Math.floor(Math.random() * 256),
+        g: Math.floor(Math.random() * 256),
+        b: Math.floor(Math.random() * 256)
+    };
 }
 
 function colorToHex(c) {
-    // OPRAVA: Zaokrouhlíme hodnoty na celá čísla před konverzí na hex
     const r = Math.round(c.r);
     const g = Math.round(c.g);
     const b = Math.round(c.b);
@@ -542,7 +549,6 @@ function colorToHex(c) {
 }
 
 function similarColor(base, variance) {
-    // OPRAVA: Zaokrouhlíme výsledek na celé číslo
     const clamp = (v) => Math.max(0, Math.min(255, Math.round(v)));
     return {
         r: clamp(base.r + (Math.random() - 0.5) * variance * 2),
@@ -555,21 +561,16 @@ function newColorRound() {
     colorLocked = false;
     const correct = randomColor();
     const correctHex = colorToHex(correct);
-
-    // Obtížnost se zvyšuje se sérií
     const variance = Math.max(30, 100 - colorStreak * 8);
 
-    let options = [];
     colorCorrectIndex = Math.floor(Math.random() * 6);
+    let options = [];
     for (let i = 0; i < 6; i++) {
-        if (i === colorCorrectIndex) {
-            options.push(correct);
-        } else {
-            options.push(similarColor(correct, variance));
-        }
+        options.push(i === colorCorrectIndex ? correct : similarColor(correct, variance));
     }
 
-    document.getElementById('colorDisplay').style.display = 'none';
+    document.getElementById('colorDisplay').style.backgroundColor = correctHex;
+    document.getElementById('colorDisplay').style.display = 'block';
     document.getElementById('colorHex').textContent = correctHex;
 
     const optionsEl = document.getElementById('colorOptions');
