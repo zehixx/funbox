@@ -74,10 +74,11 @@ function initTimeline() {
         }, 100);
         return;
     }
+
     timelineInitialized = true;
 
     const container = document.querySelector('.timeline-container');
-    timelineData.forEach((item, i) => {
+    timelineData.forEach((item) => {
         const div = document.createElement('div');
         div.className = 'timeline-item';
         div.innerHTML = `
@@ -153,6 +154,7 @@ function toggleIngredient(i, btn) {
 function updatePot() {
     const potItems = document.getElementById('potItems');
     const cookBtn = document.getElementById('cookBtn');
+
     if (selectedIngredients.size === 0) {
         potItems.textContent = 'Zatím prázdný hrnec...';
         cookBtn.disabled = true;
@@ -181,7 +183,7 @@ function cook() {
     setTimeout(() => {
         const r = recipes[0];
         const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
-        const dishIcons = ['🍽️','🥘','🫕','🍜','🥣','🍛'];
+        const dishIcons = ['🍽️', '🥘', '🫕', '🍜', '🥣', '🍛'];
 
         document.getElementById('dishIcon').textContent = pick(dishIcons);
         document.getElementById('dishName').textContent = pick(r.names);
@@ -202,34 +204,50 @@ function closeResult() {
 // GRAVITAČNÍ HŘIŠTĚ
 // ============================================================
 let matterEngine, matterRender, matterRunner, matterBodies = [];
+let gravityClickHandler = null;
+let gravityInitialized = false;
+let _hintVisible = true;
 
 function initGravity() {
+    if (gravityInitialized) {
+        _clearGravityBodies();
+        document.getElementById('canvasHint').style.opacity = '1';
+        _hintVisible = true;
+        return;
+    }
+
+    gravityInitialized = true;
+
     const container = document.getElementById('canvasContainer');
     const canvas = document.getElementById('gravityCanvas');
     const hint = document.getElementById('canvasHint');
+    const slider = document.getElementById('gravitySlider');
+    const gValue = document.getElementById('gravityValue');
 
     const w = container.clientWidth;
     const h = container.clientHeight;
-    canvas.width = w * window.devicePixelRatio;
-    canvas.height = h * window.devicePixelRatio;
+    const dpr = window.devicePixelRatio || 1;
+
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
 
-    const Engine = Matter.Engine,
-          Render = Matter.Render,
-          Runner = Matter.Runner,
-          Bodies = Matter.Bodies,
-          Composite = Matter.Composite;
+    const Engine = Matter.Engine;
+    const Render = Matter.Render;
+    const Runner = Matter.Runner;
+    const Bodies = Matter.Bodies;
+    const Composite = Matter.Composite;
 
     matterEngine = Engine.create();
-    matterEngine.gravity.y = 1;
+    matterEngine.gravity.y = parseFloat(slider.value) || 1;
 
     matterRender = Render.create({
         canvas: canvas,
         engine: matterEngine,
         options: {
-            width: w * window.devicePixelRatio,
-            height: h * window.devicePixelRatio,
+            width: w * dpr,
+            height: h * dpr,
             wireframes: false,
             background: '#ffffff',
             pixelRatio: 1
@@ -238,68 +256,105 @@ function initGravity() {
 
     const wallOpts = { isStatic: true, render: { fillStyle: '#e4e4e7' } };
     const thick = 60;
-    Composite.add(matterEngine.world, [
-        Bodies.rectangle(w * window.devicePixelRatio / 2, h * window.devicePixelRatio + thick / 2, w * window.devicePixelRatio + 100, thick, wallOpts),
-        Bodies.rectangle(-thick / 2, h * window.devicePixelRatio / 2, thick, h * window.devicePixelRatio * 3, wallOpts),
-        Bodies.rectangle(w * window.devicePixelRatio + thick / 2, h * window.devicePixelRatio / 2, thick, h * window.devicePixelRatio * 3, wallOpts)
-    ]);
+
+    _addGravityWalls(Bodies, Composite, w, h, dpr, thick, wallOpts);
 
     Render.run(matterRender);
     matterRunner = Runner.create();
     Runner.run(matterRunner, matterEngine);
 
-    let hintVisible = true;
-    canvas.addEventListener('click', (e) => {
-        if (hintVisible) {
+    hint.style.opacity = '1';
+    _hintVisible = true;
+
+    gravityClickHandler = (e) => {
+        if (!matterEngine) return;
+
+        if (_hintVisible) {
             hint.style.opacity = '0';
-            hintVisible = false;
+            _hintVisible = false;
         }
+
         const rect = canvas.getBoundingClientRect();
         const scaleX = canvas.width / rect.width;
         const scaleY = canvas.height / rect.height;
         const x = (e.clientX - rect.left) * scaleX;
         const y = (e.clientY - rect.top) * scaleY;
-        const radius = 10 + Math.random() * 20;
+        const radius = (10 + Math.random() * 20) * dpr;
 
         const hue = Math.floor(Math.random() * 360);
-        const ball = Bodies.circle(x, y, radius * window.devicePixelRatio, {
-            restitution: 0.6,
-            friction: 0.05,
-            render: {
-                fillStyle: `hsl(${hue}, 70%, 55%)`
-            }
+        const ball = Bodies.circle(x, y, radius, {
+            restitution: 0.75,
+            friction: 0.02,
+            frictionAir: 0.001,
+            density: 0.0012,
+            render: { fillStyle: `hsl(${hue}, 75%, 58%)` }
         });
-        Composite.add(matterEngine.world, ball);
-        matterBodies.push(ball);
-    });
 
-    const slider = document.getElementById('gravitySlider');
-    const gValue = document.getElementById('gravityValue');
-    slider.value = 1;
-    gValue.textContent = '1.0';
+        Matter.Composite.add(matterEngine.world, ball);
+        matterBodies.push(ball);
+    };
+
+    canvas.addEventListener('click', gravityClickHandler);
+
     slider.oninput = () => {
+        if (!matterEngine) return;
         const v = parseFloat(slider.value);
         matterEngine.gravity.y = v;
         gValue.textContent = v.toFixed(1);
+
+        const percent = ((v - parseFloat(slider.min || 0)) / (parseFloat(slider.max || 5) - parseFloat(slider.min || 0))) * 100;
+        slider.style.setProperty('--val', `${percent}%`);
     };
+
+    gValue.textContent = matterEngine.gravity.y.toFixed(1);
+    const percent = ((matterEngine.gravity.y - parseFloat(slider.min || 0)) / (parseFloat(slider.max || 5) - parseFloat(slider.min || 0))) * 100;
+    slider.style.setProperty('--val', `${percent}%`);
 
     gravityEngine = matterEngine;
 }
 
+function _addGravityWalls(Bodies, Composite, w, h, dpr, thick, wallOpts) {
+    Composite.add(matterEngine.world, [
+        Bodies.rectangle((w * dpr) / 2, h * dpr + thick / 2, w * dpr + 100, thick, wallOpts),
+        Bodies.rectangle(-thick / 2, (h * dpr) / 2, thick, h * dpr * 3, wallOpts),
+        Bodies.rectangle(w * dpr + thick / 2, (h * dpr) / 2, thick, h * dpr * 3, wallOpts)
+    ]);
+}
+
+function _clearGravityBodies() {
+    matterBodies.forEach(body => {
+        Matter.Composite.remove(matterEngine.world, body);
+    });
+    matterBodies = [];
+}
+
+function resetGravity() {
+    _clearGravityBodies();
+    document.getElementById('canvasHint').style.opacity = '1';
+    _hintVisible = true;
+}
+
 function stopGravity() {
+    const canvas = document.getElementById('gravityCanvas');
+
+    if (canvas && gravityClickHandler) {
+        canvas.removeEventListener('click', gravityClickHandler);
+        gravityClickHandler = null;
+    }
+
     if (matterRender) Matter.Render.stop(matterRender);
     if (matterRunner) Matter.Runner.stop(matterRunner);
-    if (matterEngine) Matter.Engine.clear(matterEngine);
+    if (matterEngine) {
+        Matter.World.clear(matterEngine.world, false);
+        Matter.Engine.clear(matterEngine);
+    }
+
     matterBodies = [];
     matterEngine = null;
     matterRender = null;
     matterRunner = null;
-}
-
-function resetGravity() {
-    stopGravity();
-    document.getElementById('canvasHint').style.opacity = '1';
-    initGravity();
+    gravityEngine = null;
+    gravityInitialized = false;
 }
 
 // ============================================================
@@ -362,7 +417,7 @@ function stopCensus() {
 // ============================================================
 // REAKČNÍ TEST
 // ============================================================
-let reactionState = 'idle'; // idle, waiting, ready, result, too-early
+let reactionState = 'idle';
 let reactionTimeout = null;
 let reactionStartTime = 0;
 let reactionResults = [];
@@ -384,7 +439,6 @@ function handleReactionClick() {
     const text = document.getElementById('reactionText');
 
     if (reactionState === 'idle' || reactionState === 'result' || reactionState === 'too-early') {
-        // Start waiting
         reactionState = 'waiting';
         box.className = 'reaction-box waiting';
         text.textContent = 'Počkej na zelenou...';
@@ -396,13 +450,11 @@ function handleReactionClick() {
             reactionStartTime = performance.now();
         }, delay);
     } else if (reactionState === 'waiting') {
-        // Clicked too early
         clearTimeout(reactionTimeout);
         reactionState = 'too-early';
         box.className = 'reaction-box too-early';
         text.textContent = 'Příliš brzy! Klikni znovu.';
     } else if (reactionState === 'ready') {
-        // Measure
         const time = Math.round(performance.now() - reactionStartTime);
         reactionState = 'result';
         box.className = 'reaction-box result';
@@ -421,14 +473,14 @@ function updateReactionUI() {
     ).join('');
 
     const bestTime = Math.min(...reactionResults);
-    const avg = Math.round(reactionResults.reduce((a,b) => a+b, 0) / reactionResults.length);
+    const avg = Math.round(reactionResults.reduce((a, b) => a + b, 0) / reactionResults.length);
     best.innerHTML = `Nejlepší: <span>${bestTime} ms</span> · Průměr: <span>${avg} ms</span>`;
 }
 
 // ============================================================
 // PEXESO
 // ============================================================
-const memoryEmojis = ['🐶','🐱','🐸','🦊','🐻','🐼','🐨','🦁'];
+const memoryEmojis = ['🐶', '🐱', '🐸', '🦊', '🐻', '🐼', '🐨', '🦁'];
 let memoryCards = [];
 let memoryFlipped = [];
 let memoryMatched = 0;
@@ -472,7 +524,6 @@ function flipMemoryCard(index, card) {
 
         const [a, b] = memoryFlipped;
         if (memoryCards[a.index] === memoryCards[b.index]) {
-            // Match
             a.card.classList.add('matched');
             b.card.classList.add('matched');
             memoryMatched++;
@@ -487,7 +538,6 @@ function flipMemoryCard(index, card) {
                 }, 500);
             }
         } else {
-            // No match
             memoryLocked = true;
             setTimeout(() => {
                 a.card.classList.remove('flipped');
@@ -505,7 +555,7 @@ function closeMemoryModal() {
 }
 
 // ============================================================
-// HÁDEJ BARVU - OPRAVENO
+// HÁDEJ BARVU
 // ============================================================
 let colorScore = 0;
 let colorStreak = 0;
@@ -528,7 +578,6 @@ function randomColor() {
 }
 
 function colorToHex(c) {
-    // OPRAVA: Zaokrouhlíme hodnoty na celá čísla před konverzí na hex
     const r = Math.round(c.r);
     const g = Math.round(c.g);
     const b = Math.round(c.b);
@@ -536,7 +585,6 @@ function colorToHex(c) {
 }
 
 function similarColor(base, variance) {
-    // OPRAVA: Zaokrouhlíme výsledek na celé číslo
     const clamp = (v) => Math.max(0, Math.min(255, Math.round(v)));
     return {
         r: clamp(base.r + (Math.random() - 0.5) * variance * 2),
@@ -549,12 +597,11 @@ function newColorRound() {
     colorLocked = false;
     const correct = randomColor();
     const correctHex = colorToHex(correct);
-
-    // Obtížnost se zvyšuje se sérií
     const variance = Math.max(30, 100 - colorStreak * 8);
 
     let options = [];
     colorCorrectIndex = Math.floor(Math.random() * 6);
+
     for (let i = 0; i < 6; i++) {
         if (i === colorCorrectIndex) {
             options.push(correct);
@@ -622,6 +669,7 @@ function initTyping() {
     typingText = typingTexts[Math.floor(Math.random() * typingTexts.length)];
     typingStarted = false;
     typingFinished = false;
+
     if (typingInterval) clearInterval(typingInterval);
 
     const input = document.getElementById('typingInput');
@@ -659,6 +707,7 @@ function initTyping() {
 function renderTypingDisplay(typed, full) {
     const display = document.getElementById('typingDisplay');
     let html = '';
+
     for (let i = 0; i < full.length; i++) {
         if (i < typed.length) {
             if (typed[i] === full[i]) {
@@ -672,6 +721,7 @@ function renderTypingDisplay(typed, full) {
             html += `<span class="typed-remaining">${escapeHtml(full[i])}</span>`;
         }
     }
+
     display.innerHTML = html;
 }
 
@@ -684,6 +734,7 @@ function escapeHtml(c) {
 
 function updateTypingStats() {
     if (!typingStarted) return;
+
     const elapsed = (performance.now() - typingStartTime) / 1000;
     const typed = document.getElementById('typingInput').value;
 
