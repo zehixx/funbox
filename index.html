@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Funbox</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <!-- BACK BUTTON -->
+    <button class="back-btn" id="backBtn" onclick="navigateTo('hub')">
+        ← Zpět na výběr
+    </button>
+
+    <!-- ===== HUB ===== -->
+    <section id="hub" class="section active visible">
+        <div class="hub-header">
+            <h1>Funbox</h1>
+            <p>Vyber si, čím si chceš hrát.</p>
+        </div>
+        <div class="card-grid">
+            <div class="card" onclick="navigateTo('timeline')">
+                <span class="card-icon">⏳</span>
+                <h2>Škála času</h2>
+                <p>Od mrknutí oka po stáří vesmíru. Scrolluj a objev, jak dlouho co trvá.</p>
+            </div>
+            <div class="card" onclick="navigateTo('chef')">
+                <span class="card-icon">🍳</span>
+                <h2>Hrozný šéfkuchař</h2>
+                <p>Vyber ingredience, které do jídla nepatří. Uvidíš, co vznikne.</p>
+            </div>
+            <div class="card" onclick="navigateTo('gravity')">
+                <span class="card-icon">🪐</span>
+                <h2>Gravitační hřiště</h2>
+                <p>Klikej a pouštěj kuličky. Ovládej gravitaci. Pozoruj fyziku.</p>
+            </div>
+            <div class="card" onclick="navigateTo('census')">
+                <span class="card-icon">🌐</span>
+                <h2>Sčítání lidu na internetu</h2>
+                <p>Sleduj v reálném čase, co se právě děje na internetu.</p>
+            </div>
+            <div class="card" onclick="navigateTo('reaction')">
+                <span class="card-icon">⚡</span>
+                <h2>Reakční test</h2>
+                <p>Jak rychle dokážeš kliknout? Otestuj svoje reflexy.</p>
+            </div>
+            <div class="card" onclick="navigateTo('memory')">
+                <span class="card-icon">🧠</span>
+                <h2>Pexeso</h2>
+                <p>Klasická paměťová hra. Najdi všechny páry na co nejméně tahů.</p>
+            </div>
+            <div class="card" onclick="navigateTo('colorgame')">
+                <span class="card-icon">🎨</span>
+                <h2>Hádej barvu</h2>
+                <p>Dostaneš HEX kód – uhádneš, která barva to je?</p>
+            </div>
+            <div class="card" onclick="navigateTo('typing')">
+                <span class="card-icon">⌨️</span>
+                <h2>Rychlost psaní</h2>
+                <p>Jak rychle dokážeš psát? Změř si slova za minutu.</p>
+            </div>
+        </div>
+        <div class="hub-footer">Vyrobeno pro zábavu</div>
+    </section>
+
+    <!-- ===== ŠKÁLA ČASU ===== -->
+    <section id="timeline" class="section">
+        <div class="section-header">
+            <h1>⏳ Škála času</h1>
+            <p>Scrolluj dolů a objev rozměr času</p>
+        </div>
+        <div class="timeline-container">
+            <div class="timeline-line"></div>
+        </div>
+    </section>
+
+    <!-- ===== HROZNÝ ŠÉFKUCHAŘ ===== -->
+    <section id="chef" class="section">
+        <div class="section-header">
+            <h1>🍳 Hrozný šéfkuchař</h1>
+            <p>Vyber ingredience a zjisti, co ti vznikne</p>
+        </div>
+        <div class="chef-area">
+            <div class="ingredients-label">Ingredience</div>
+            <div class="ingredients-grid" id="ingredientsGrid"></div>
+            <div class="pot-area">
+                <span class="pot" id="potIcon">🍲</span>
+                <div class="pot-items" id="potItems">Zatím prázdný hrnec...</div>
+            </div>
+            <div style="text-align:center;">
+                <button class="cook-btn" id="cookBtn" disabled onclick="cook()">Vařit!</button>
+            </div>
+        </div>
+        <div class="result-modal" id="resultModal">
+            <div class="result-card">
+                <span class="dish-icon" id="dishIcon">🍽️</span>
+                <h2 id="dishName"></h2>
+                <div class="stats" id="dishStats"></div>
+                <button class="close-btn" onclick="closeResult()">Hotovo</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== GRAVITAČNÍ HŘIŠTĚ ===== -->
+    <section id="gravity" class="section">
+        <div class="section-header">
+            <h1>🪐 Gravitační hřiště</h1>
+            <p>Klikni kamkoli na plátno pro přidání kuličky</p>
+        </div>
+        <div class="gravity-wrapper">
+            <div class="canvas-container" id="canvasContainer">
+                <canvas id="gravityCanvas"></canvas>
+                <span class="canvas-hint" id="canvasHint">Klikni sem</span>
+            </div>
+            <div class="gravity-controls">
+                <label>Gravitace:</label>
+                <input type="range" class="gravity-slider" id="gravitySlider" min="0" max="5" step="0.1" value="1">
+                <span class="gravity-value" id="gravityValue">1.0</span>
+                <button class="gravity-reset" id="gravityResetBtn" onclick="resetGravity()">Vyčistit</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== SČÍTÁNÍ LIDU ===== -->
+    <section id="census" class="section">
+        <div class="section-header">
+            <h1>🌐 Sčítání lidu na internetu</h1>
+            <p>Co se stalo od chvíle, kdy jsi otevřel tuto stránku</p>
+        </div>
+        <div class="census-grid" id="censusGrid"></div>
+        <div class="census-note">Data jsou simulovaná na základě průměrných globálních statistik za sekundu.</div>
+    </section>
+
+    <!-- ===== REAKČNÍ TEST ===== -->
+    <section id="reaction" class="section">
+        <div class="section-header">
+            <h1>⚡ Reakční test</h1>
+            <p>Klikni co nejrychleji, jakmile se barva změní na zelenou</p>
+        </div>
+        <div class="reaction-area">
+            <div class="reaction-box idle" id="reactionBox" onclick="handleReactionClick()">
+                <span id="reactionText">Klikni pro start</span>
+            </div>
+            <div class="reaction-best" id="reactionBest"></div>
+            <div class="reaction-history" id="reactionHistory"></div>
+        </div>
+    </section>
+
+    <!-- ===== PEXESO ===== -->
+    <section id="memory" class="section">
+        <div class="section-header">
+            <h1>🧠 Pexeso</h1>
+            <p>Najdi všechny páry</p>
+        </div>
+        <div class="memory-area">
+            <div class="memory-stats">
+                <div class="memory-stat">
+                    <div class="memory-stat-value" id="memoryMoves">0</div>
+                    <div class="memory-stat-label">Tahy</div>
+                </div>
+                <div class="memory-stat">
+                    <div class="memory-stat-value" id="memoryPairs">0 / 8</div>
+                    <div class="memory-stat-label">Páry</div>
+                </div>
+            </div>
+            <div class="memory-grid" id="memoryGrid"></div>
+            <button class="game-btn" onclick="initMemory()" style="font-size:14px; padding:12px 32px;">Nová hra</button>
+        </div>
+        <div class="memory-complete-modal" id="memoryModal">
+            <div class="memory-complete-card">
+                <span style="font-size:56px;display:block;margin-bottom:12px;">🎉</span>
+                <h2>Výborně!</h2>
+                <p id="memoryResult"></p>
+                <button class="modal-close-btn" onclick="closeMemoryModal()">Hrát znovu</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== HÁDEJ BARVU ===== -->
+    <section id="colorgame" class="section">
+        <div class="section-header">
+            <h1>🎨 Hádej barvu</h1>
+            <p>Který čtverec odpovídá HEX kódu?</p>
+        </div>
+        <div class="color-area">
+            <div class="color-display" id="colorDisplay"></div>
+            <div class="color-hex" id="colorHex">#000000</div>
+            <div class="color-options" id="colorOptions"></div>
+            <div class="color-score">Skóre: <span id="colorScore">0</span></div>
+            <div class="color-streak" id="colorStreak"></div>
+        </div>
+    </section>
+
+    <!-- ===== RYCHLOST PSANÍ ===== -->
+    <section id="typing" class="section">
+        <div class="section-header">
+            <h1>⌨️ Rychlost psaní</h1>
+            <p>Přepiš text co nejrychleji a nejpřesněji</p>
+        </div>
+        <div class="typing-area">
+            <div class="typing-text-display" id="typingDisplay"></div>
+            <input type="text" class="typing-input" id="typingInput" placeholder="Začni psát tady..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            <div class="typing-stats">
+                <div class="typing-stat">
+                    <div class="typing-stat-value" id="typingWPM">0</div>
+                    <div class="typing-stat-label">WPM</div>
+                </div>
+                <div class="typing-stat">
+                    <div class="typing-stat-value" id="typingAccuracy">100%</div>
+                    <div class="typing-stat-label">Přesnost</div>
+                </div>
+                <div class="typing-stat">
+                    <div class="typing-stat-value" id="typingTime">0s</div>
+                    <div class="typing-stat-label">Čas</div>
+                </div>
+            </div>
+            <div class="typing-restart">
+                <button class="game-btn" onclick="initTyping()" style="font-size:14px; padding:12px 32px;">Nový text</button>
+            </div>
+        </div>
+    </section>
+
+    <script src="js/script.js"></script>
+</body>
+</html>
