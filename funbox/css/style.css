@@ -563,8 +563,7 @@ body {
     border: 1.5px solid var(--gray-200);
     border-radius: var(--radius);
     overflow: hidden;
-    cursor: crosshair;
-    color: #000000;
+    cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><line x1="8" y1="0" x2="8" y2="16" stroke="black" stroke-width="2"/><line x1="0" y1="8" x2="16" y2="8" stroke="black" stroke-width="2"/></svg>') 8 8, crosshair;
     position: relative;
     background: var(--white);
     box-shadow: 0 8px 40px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.8);
